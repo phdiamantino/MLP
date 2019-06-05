@@ -1,0 +1,113 @@
+# Função de ativação sigmoidal
+fU = function(U) {
+  return ( 1/(1+exp(-U)))
+}
+# Derivada da F de U
+deriv = function(f_U) {
+  return (f_U *( 1 - f_U))
+}
+
+# Arquitetura da rede
+mlp = function (input.length, hidden.length, output.length){
+  # Criando a arquitetura da rede
+  model = list()
+  model$input.length = input.length
+  model$hidden.length = hidden.length
+  model$output.length = output.length
+  
+  # Gerar os pesos automaticamente +  bias
+  model$hidden = matrix(runif(min= -1, max= 1, hidden.length*(input.length + 1)), nrow=hidden.length, ncol=input.length + 1)
+  model$output = matrix(runif(min= -1, max= 1, output.length*(hidden.length + 1)), nrow=output.length, ncol= hidden.length+1)
+  return(model)
+}
+arq = mlp (6,6,2)  
+arq
+
+forward = function (model, Xp){
+  #multiplica os pesos da hidden layer com a entrada de exemplos
+  U_h_p   = model$hidden %*% c(Xp, 1)
+  f_U_h_p = fU(U_h_p)
+  
+  #output layer  (se nao der certo, coloca  as.numeric)
+  U_o_p   = model$output %*% c(as.numeric(f_U_h_p), 1)
+  f_U_o_p = fU(U_o_p)
+  
+  #Resultados
+  ret = list()
+  ret$f_U_h_p = f_U_h_p
+  ret$f_U_o_p = f_U_o_p
+  return(ret)
+}
+test = forward(model = arq, c(1,2,1,2,1,2))
+test$f_U_o_p
+round(test$f_U_o_p)
+lol[1,(arq$input.length + 1): ncol(lol)]
+deriv(test$f_U_o_p)
+
+backward = function (model, dataset, eta = 0.1, limiar = 1e-2) {
+  X = dataset[,1:model$input.length]
+  Y = dataset[,(model$input.length + 1): ncol(dataset)]
+  epochs = 0
+  erroQ  = 2 * limiar
+  while (erroQ > limiar & epochs < 10000){
+    erroQ = 0
+    for (p in 1:nrow(dataset)){
+      Xp = as.numeric(X[p,])
+      Yp = as.numeric(Y[p,])
+      
+      result = forward(model, Xp)
+      
+      # Valor obtido
+      Yo = result$f_U_o_p
+      #Erro: Valor esperado menos o valor obtido
+      error = Yp - Yo
+      # Calculando erro quadrático
+      erroQ = erroQ + sum(error^2)
+      
+      # Training Output
+      delta_o_p = error * deriv(result$f_U_o_p)
+      
+      # Training hidden
+      weights_h =  model$output[,1:model$hidden.length]
+      delta_h_p =  as.numeric(deriv(result$f_U_h_p)) * (as.numeric(delta_o_p) %*% weights_h)
+      
+      # training
+      # Atualizando pesos
+      #model$output = model$output + eta * (as.vector(delta_o_p) %*% t(c(as.vector(fwd$f_h_net_h_pj), 1)))
+      model$output = model$output + eta * ((delta_o_p) %*% c(as.vector(result$f_U_h_p),1))
+      #model$layers$hidden = model$layers$hidden + eta * (as.vector(delta_h_p) %*% t(c(x_p, 1)))
+      model$hidden = model$hidden + eta * (as.numeric(delta_h_p) %*% t(c(Xp, 1)))
+      
+    }
+    erroQ = erroQ / nrow(dataset)
+    cat("\nErro médio quadratico: ", erroQ)
+    epochs = epochs + 1
+  }
+  ret = list()
+  ret$model = model
+  ret$epochs = epochs
+  return(ret)
+}
+lol = read.csv("E:/Mestrado/Datasets/leagueOfLegends.csv")
+#normalize
+for (i in 1:6) {lol[,i] = (lol[,i] - min(lol[,i])) / max(lol[,i])-min(lol[,i])} 
+lol
+require(nnet)
+lol = cbind(lol[,1:6], class.ind(lol[,7]))
+lol = lol[1:80,]
+lol
+train = backward(model= arq, dataset= lol, eta = 0.3)
+train$model
+#_____________________________________________________________________________________
+
+lol = read.csv("E:/Mestrado/Datasets/leagueOfLegends.csv")
+lol[,1:6] = scale(lol[,1:6])
+#normalize
+for (i in 1:6) {lol[,i] = (lol[,i] - min(lol[,i])) / max(lol[,i])-min(lol[,i])} 
+require(nnet)
+lol = cbind(lol[,1:6], class.ind(lol[,7]))
+lol = lol[1:80,]
+train = backward(model= arq, dataset= lol, eta = 0.3, limiar = 0.03)
+train$model
+train
+
